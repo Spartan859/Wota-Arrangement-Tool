@@ -1,0 +1,15 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 虚拟环境
+venv/
+.venv/
+
+# 自动生成的编排表
+*.xlsx
+*.txt
+
+# 编辑器配置
+.vscode/
+.idea/
