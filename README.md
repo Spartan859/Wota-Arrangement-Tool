@@ -86,15 +86,3 @@ python wota_tool.py
 
 #### 💡 进阶技巧：自定义板块
 如果你想使用表格外自定义的名称（例如想写 `Sabi` 而不是 `副歌`），直接输入 `Sabi 8` 即可，脚本具有很强的兼容性，会自动识别并填入 Excel。
-
-## 📂 仓库结构建议
-
-为了获得最佳体验，请确保你的 `.gitignore` 包含 `venv/` 和 `*.xlsx`。
-
-```text
-.
-├── wota_tool.py         # 核心脚本
-├── requirements.txt     # 依赖清单 (仅 openpyxl)
-├── README.md            # 项目文档
-└── .gitignore           # Git 忽略配置
-```
