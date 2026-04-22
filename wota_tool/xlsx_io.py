@@ -97,10 +97,26 @@ class XlsxIO:
             print(f" ✅ 已载入：{path.name}（段落 {len(self.state.blocks)} 个）")
             return
 
-    def _build_workbook(self) -> Workbook:
-        workbook = Workbook()
-        worksheet = workbook.active
-        worksheet.title = "打艺编排脚本"
+    def _build_workbook(self, base_path: "Path | None" = None) -> Workbook:
+        if base_path is not None and base_path.exists():
+            workbook = load_workbook(base_path)
+            worksheet = workbook.active
+            # Remove all merged ranges that touch columns A-F
+            for rng in list(worksheet.merged_cells.ranges):
+                if rng.min_col <= 6:
+                    worksheet.unmerge_cells(str(rng))
+            # Clear values and styles in columns A-F
+            for row in worksheet.iter_rows(min_col=1, max_col=6):
+                for cell in row:
+                    cell.value = None
+                    cell.fill = PatternFill()
+                    cell.font = Font()
+                    cell.border = Border()
+                    cell.alignment = Alignment()
+        else:
+            workbook = Workbook()
+            worksheet = workbook.active
+            worksheet.title = "打艺编排脚本"
 
         fill_odd = PatternFill(start_color="F9FAFB", end_color="F9FAFB", fill_type="solid")
         fill_even = PatternFill(start_color="EFF3F6", end_color="EFF3F6", fill_type="solid")
@@ -188,7 +204,8 @@ class XlsxIO:
         target_path = self._resolve_output_path(output_path)
         while True:
             try:
-                workbook = self._build_workbook()
+                base = target_path if target_path.exists() else None
+                workbook = self._build_workbook(base_path=base)
                 target_path.parent.mkdir(parents=True, exist_ok=True)
                 workbook.save(target_path)
                 self.default_output_path = target_path
