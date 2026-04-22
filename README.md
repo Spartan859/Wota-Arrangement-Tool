@@ -39,11 +39,55 @@ pip install -r requirements.txt
 才会对着被描绘得波澜壮阔的未来有所期待
 ```
 
+#### 可选：先把 `.lrc` 转成 `.txt`（自动去时间戳）
+
+如果你手头是 LRC 歌词，可以先执行：
+
+```bash
+python tools/lrc2txt.py "Reply - livetune,夏吉ゆうこ.lrc" -o lyrics.txt
+```
+
+常见参数：
+- `--strip-tags`：移除 `[ti:]`、`[ar:]`、`[al:]`、`[by:]` 等元信息行
+- 不传 `-o` 时，默认输出到与输入同名的 `.txt`
+
 ### 第二步：运行脚本
 
 ```bash
 python wota_tool.py
 ```
+
+启动后支持三种模式：
+- `1` 新建编排（原流程）
+- `2` 读取已生成 xlsx 并继续编辑
+- `3` 从 txt 新建后进入完整编辑模式
+
+### 可选：完整编辑模式命令速查
+
+在模式 `2/3` 下可用：
+
+```text
+ls
+ins <idx> <type> <beats> [pure]
+inject <idx> <txt_path>
+del <idx>
+set <idx> type|beats|arrangement|remarks <value>
+mv <from> <to>
+lyrics add <idx> <pos> <jp>|<cn>
+lyrics set <idx> <pos> <jp>|<cn>
+lyrics del <idx> <pos>
+u
+redo
+save [path]
+fix-merge
+done
+```
+
+说明：
+- `fix-merge` 不会直接改文件；保存时会自动按当前段落结构重建合并单元格。
+- xlsx 读取当前仅保证兼容**本工具生成的标准模板**。
+- `inject` 会读取 txt（按日/中交替），并在指定编号段落后进入“注入流水线”插入新块。
+- 注入流水线快捷键：`Enter` 收纳，`↓/j/skip` 跳过当前行，`↑/k/u` 回退。
 
 ### 第三步：执行指令
 
@@ -75,6 +119,7 @@ python wota_tool.py
 * **收纳 (Accumulate)**：直接按 **回车**。当前显示的日文/中文歌词会被存入“暂存区”，并自动展示下一句。
 * **打包 (Pack)**：输入 `类型 + 拍数`（如 `r 16`）。脚本会将暂存区的所有歌词连同当前这一句，一起打包进“副歌”板块，并清空暂存区。
 * **插入纯间奏**：如果在暂存区为空时输入 `i 4`，脚本会插入一段 4 拍的纯动作间奏，不消耗任何歌词。
+* **跳过当前行 (Skip)**：输入 `skip`（或 `↓` / `j`）跳过当前歌词，不进入暂存区。
 
 **C. 全局撤销 (Undo)**
 * **指令**：`u`
