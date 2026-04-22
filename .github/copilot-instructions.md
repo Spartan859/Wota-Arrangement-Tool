@@ -37,7 +37,8 @@ The application is a **stateful CLI pipeline** that turns bilingual lyric pairs 
       - load existing xlsx and continue editing
       - create from txt then enter full edit mode
    - Workflow phases for new arrangement: intro (`p`), lyric pipeline (Enter to accumulate, `<type> <beats>` to pack), tail-buffer flush, outro (`o`).
-   - Full edit mode supports block insert/delete/update/reorder, lyric row edits, txt injection (`inject <idx> <txt_path>`), undo/redo, and explicit save.
+   - Full edit mode supports block insert/delete/update/reorder, lyric row edits, block lyric detail view (`show <idx>`), txt injection (`inject <idx> <txt_path>`), undo/redo, and explicit save.
+   - `ins` and `inject` use the same index semantics: insert **after** `idx` (`idx=0` means insert at head).
    - Undo/redo are snapshot-based: mutate operations push `copy.deepcopy(state)` into history.
 
 3. **Excel rendering (`wota_tool.py`)**
@@ -64,4 +65,5 @@ The application is a **stateful CLI pipeline** that turns bilingual lyric pairs 
 - **CLI interaction language and user-facing output are Chinese-first**; keep prompts/messages consistent with existing style when editing behavior.
 - **LRC conversion behavior**: timestamp-only lines are dropped after cleanup; metadata tag lines are preserved by default and removed only with `--strip-tags`.
 - **Merge repair behavior**: xlsx merge regions are rebuilt from current block structure at save time; `fix-merge` only announces this behavior.
-- **Pipeline skip behavior**: lyric pipeline supports skipping current pair via `skip` and aliases (`↓`, `j`), with rollback via `u` and aliases (`↑`, `k`).
+- **Pipeline behavior**: pack commands consume only staged lyrics (not the current row) and do not advance pointer; skip uses `skip`/`↓`/`j`, rollback uses `u`/`↑` (no `k` alias).
+- **Inject early-exit behavior**: inject mode supports `q`/`quit` to exit early while keeping and inserting blocks already generated in this inject session.

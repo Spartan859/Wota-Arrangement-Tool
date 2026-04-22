@@ -127,11 +127,21 @@ class WotaArrangementTool:
     def _normalize_nav_command(raw_cmd: str) -> str:
         cmd = raw_cmd.strip()
         lowered = cmd.lower()
-        if lowered in {"\x1b[a", "{up}", "up", "↑", "k"}:
+        if lowered in {"\x1b[a", "{up}", "up", "↑"}:
             return "u"
         if lowered in {"\x1b[b", "{down}", "down", "↓", "j", "skip"}:
             return "skip"
         return lowered
+
+    @staticmethod
+    def _print_staging_preview(staging: List[Tuple[str, str]]) -> None:
+        if not staging:
+            print(" 📦 暂存区: （空）")
+            return
+        print(f" 📦 暂存区: {len(staging)} 句")
+        for i, (jp, cn) in enumerate(staging, 1):
+            print(f"   [{i}] 日: {jp}")
+            print(f"       中: {cn}")
 
     @staticmethod
     def _cell_str(value: object) -> str:
@@ -263,11 +273,11 @@ class WotaArrangementTool:
                 print("   ⚠️ 格式错误，例如 'p 8'")
 
     def _run_lyric_pipeline(self) -> None:
-        print("\n" + "═" * 60 + "\n 【 歌词处理中 】 回车收纳 / 代码打包 / u(或↑/k)撤销 / skip(或↓/j)跳过\n" + "═" * 60)
+        print("\n" + "═" * 60 + "\n 【 歌词处理中 】 回车收纳 / 代码打包 / u(或↑)撤销 / skip(或↓/j)跳过\n" + "═" * 60)
         while self.state.idx < len(self.lyric_pairs):
             jp, cn = self.lyric_pairs[self.state.idx]
-            cache_info = f"📦 暂存: {len(self.state.current_lyrics)}句" if self.state.current_lyrics else ""
-            print(f"\n 🟢 [进度: {self.state.idx + 1}/{len(self.lyric_pairs)}] {cache_info}")
+            print(f"\n 🟢 [进度: {self.state.idx + 1}/{len(self.lyric_pairs)}]")
+            self._print_staging_preview(self.state.current_lyrics)
             print(f" --------------------------------------------------\n  日: {jp}\n  中: {cn}\n --------------------------------------------------")
             raw_cmd = input(" >> 指令: ")
             cmd = self._normalize_nav_command(raw_cmd)
@@ -299,16 +309,16 @@ class WotaArrangementTool:
                 self._append_pure_action_block("间奏", beats)
                 continue
 
-            self.state.current_lyrics.append((jp, cn))
+            block_lyrics = self.state.current_lyrics.copy() if self.state.current_lyrics else [("", "")]
             self.state.blocks.append(
                 Block(
                     block_type=self._resolve_section(block_code),
                     beats=beats,
-                    lyrics=self.state.current_lyrics.copy(),
+                    lyrics=block_lyrics,
                 )
             )
             self.state.current_lyrics = []
-            self.state.idx += 1
+            print(" ✅ 已打包暂存区；当前行已保留")
 
     def _run_tail_pack_phase(self) -> None:
         while self.state.current_lyrics:
@@ -384,11 +394,26 @@ class WotaArrangementTool:
                 f"{block.arrangement or '-'} | {block.remarks or '-'}"
             )
 
+    def _print_block_lyrics(self, idx_1based: int) -> None:
+        if idx_1based < 1 or idx_1based > len(self.state.blocks):
+            raise ValueError("索引越界")
+        block = self.state.blocks[idx_1based - 1]
+        print(f"\n 📄 段落详情 idx={idx_1based} | 段落={block.block_type} | 拍数={block.beats}")
+        if block.arrangement:
+            print(f" 编排: {block.arrangement}")
+        if block.remarks:
+            print(f" 备注: {block.remarks}")
+        print(" 歌词：")
+        for i, (jp, cn) in enumerate(block.lyrics, 1):
+            print(f"  [{i}] 日: {jp}")
+            print(f"      中: {cn}")
+
     def _print_edit_help(self) -> None:
         print(
             "\n编辑命令：\n"
             "  ls\n"
-            "  ins <idx> <type> <beats> [pure]\n"
+            "  show <idx>\n"
+            "  ins <idx> <type> <beats> [pure]   # 在 idx 后插入；idx=0 表示最前面\n"
             "  inject <idx> <txt_path>\n"
             "  del <idx>\n"
             "  set <idx> type|beats|arrangement|remarks <value>\n"
@@ -400,7 +425,7 @@ class WotaArrangementTool:
             "  save [path]\n"
             "  fix-merge\n"
             "  done\n"
-            "\n注入子模式快捷键：Enter=收纳，u/↑/k=回退，skip/↓/j=跳过\n"
+            "\n注入子模式快捷键：Enter=收纳，u/↑=回退，skip/↓/j=跳过，q/quit=中途退出并保留已生成部分\n"
         )
 
     def _run_edit_session(self) -> None:
@@ -418,10 +443,14 @@ class WotaArrangementTool:
                     self._print_edit_help()
                 elif cmd == "ls":
                     self._print_blocks()
+                elif cmd == "show" and len(parts) >= 2:
+                    self._print_block_lyrics(int(parts[1]))
                 elif cmd == "u":
-                    self._undo()
+                    if self._undo():
+                        self._print_blocks()
                 elif cmd == "redo":
-                    self._redo()
+                    if self._redo():
+                        self._print_blocks()
                 elif cmd == "done":
                     return
                 elif cmd == "fix-merge":
@@ -431,14 +460,16 @@ class WotaArrangementTool:
                     if len(inject_parts) < 3:
                         raise ValueError("inject 用法: inject <idx> <txt_path>")
                     self._handle_inject_command(inject_parts[1], inject_parts[2])
+                    self._print_blocks()
                 elif cmd == "del" and len(parts) >= 2:
                     block_idx = self._parse_index(parts[1])
                     self._record_snapshot()
                     deleted = self.state.blocks.pop(block_idx)
                     print(f" ✅ 已删除段落: {deleted.block_type}")
+                    self._print_blocks()
                 elif cmd == "ins" and len(parts) >= 4:
-                    insert_pos = int(parts[1])
-                    if insert_pos < 1 or insert_pos > len(self.state.blocks) + 1:
+                    insert_after_idx = int(parts[1])
+                    if insert_after_idx < 0 or insert_after_idx > len(self.state.blocks):
                         raise ValueError("插入位置越界")
                     block_type = self._resolve_section(parts[2].lower())
                     beats = parts[3].split()[0]
@@ -446,8 +477,9 @@ class WotaArrangementTool:
                     pure = len(tail) >= 5 and tail[4].strip().lower() == "pure"
                     lyrics = [PURE_ACTION_LYRIC] if pure else [("", "")]
                     self._record_snapshot()
-                    self.state.blocks.insert(insert_pos - 1, Block(block_type=block_type, beats=beats, lyrics=lyrics))
+                    self.state.blocks.insert(insert_after_idx, Block(block_type=block_type, beats=beats, lyrics=lyrics))
                     print(" ✅ 插入成功")
+                    self._print_blocks()
                 elif cmd == "set" and len(parts) >= 4:
                     block_idx = self._parse_index(parts[1])
                     field = parts[2].lower()
@@ -465,6 +497,7 @@ class WotaArrangementTool:
                     else:
                         target.remarks = value
                     print(" ✅ 修改成功")
+                    self._print_blocks()
                 elif cmd == "mv" and len(parts) >= 3:
                     from_idx = self._parse_index(parts[1])
                     to_idx = int(parts[2])
@@ -474,8 +507,10 @@ class WotaArrangementTool:
                     block = self.state.blocks.pop(from_idx)
                     self.state.blocks.insert(to_idx - 1, block)
                     print(" ✅ 重排成功")
+                    self._print_blocks()
                 elif cmd == "lyrics":
                     self._handle_lyrics_command(raw_cmd)
+                    self._print_blocks()
                 elif cmd == "save":
                     save_parts = raw_cmd.split(maxsplit=1)
                     save_path = Path(save_parts[1].strip()) if len(save_parts) == 2 else None
@@ -537,8 +572,8 @@ class WotaArrangementTool:
 
     def _handle_inject_command(self, idx_text: str, txt_path_text: str) -> None:
         idx_1based = int(idx_text)
-        if idx_1based < 1 or idx_1based > len(self.state.blocks):
-            raise ValueError("inject 的 idx 需要是现有段落编号")
+        if idx_1based < 0 or idx_1based > len(self.state.blocks):
+            raise ValueError("inject 的 idx 需在 0..当前段落数 范围内")
         txt_path = Path(txt_path_text.strip().strip('"').strip("'"))
         lyric_pairs = self._read_lyric_pairs_from_txt_path(txt_path)
         new_blocks = self._run_inject_pipeline(lyric_pairs)
@@ -549,7 +584,7 @@ class WotaArrangementTool:
         print(f" ✅ 已在段落 {idx_1based} 后插入 {len(new_blocks)} 个新段落")
 
     def _run_inject_pipeline(self, lyric_pairs: List[Tuple[str, str]]) -> List[Block]:
-        print("\n" + "═" * 60 + "\n 【 TXT 注入子模式 】回车收纳 / 代码打包 / u(↑/k)回退 / skip(↓/j)跳过\n" + "═" * 60)
+        print("\n" + "═" * 60 + "\n 【 TXT 注入子模式 】回车收纳 / 代码打包 / u(↑)回退 / skip(↓/j)跳过 / q退出\n" + "═" * 60)
         generated_blocks: List[Block] = []
         current_lyrics: List[Tuple[str, str]] = []
         idx = 0
@@ -561,10 +596,14 @@ class WotaArrangementTool:
         while True:
             while idx < len(lyric_pairs):
                 jp, cn = lyric_pairs[idx]
-                print(f"\n 🟢 [注入进度: {idx + 1}/{len(lyric_pairs)}] 暂存{len(current_lyrics)}句 已产出{len(generated_blocks)}段")
+                print(f"\n 🟢 [注入进度: {idx + 1}/{len(lyric_pairs)}] 已产出{len(generated_blocks)}段")
+                self._print_staging_preview(current_lyrics)
                 print(f" --------------------------------------------------\n  日: {jp}\n  中: {cn}\n --------------------------------------------------")
                 raw_cmd = input(" inject >> ")
                 cmd = self._normalize_nav_command(raw_cmd)
+
+                if cmd in {"q", "quit"}:
+                    return generated_blocks
 
                 if cmd == "u":
                     if history:
@@ -600,20 +639,22 @@ class WotaArrangementTool:
                     generated_blocks.append(Block(block_type="间奏", beats=beats, lyrics=[PURE_ACTION_LYRIC]))
                     continue
 
-                current_lyrics.append((jp, cn))
+                block_lyrics = current_lyrics.copy() if current_lyrics else [("", "")]
                 generated_blocks.append(
                     Block(
                         block_type=self._resolve_section(block_code),
                         beats=beats,
-                        lyrics=current_lyrics.copy(),
+                        lyrics=block_lyrics,
                     )
                 )
                 current_lyrics = []
-                idx += 1
+                print(" ✅ 已打包暂存区；当前行已保留")
 
             while current_lyrics:
                 cmd = input(f"\n 📢 注入剩余 {len(current_lyrics)} 句，请输入 [类型 拍数] 打包，或 u 回退: ").strip()
                 normalized = self._normalize_nav_command(cmd)
+                if normalized in {"q", "quit"}:
+                    return generated_blocks
                 if normalized == "u":
                     if history:
                         old_idx, old_lyrics, old_blocks = history.pop()
