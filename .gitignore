@@ -8,8 +8,11 @@ venv/
 
 # 自动生成的编排表
 *.xlsx
-*.txt
+lyrics/
 
 # 编辑器配置
 .vscode/
 .idea/
+
+tests/
+.claude/
