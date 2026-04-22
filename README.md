@@ -66,30 +66,27 @@ python wota_tool.py
 
 在模式 `2/3` 下可用：
 
-```text
-ls
-show <idx>
-ins <idx> <type> <beats> [pure]   # 在 idx 后插入；idx=0 表示最前面
-inject <idx> <txt_path>
-del <idx>
-set <idx> type|beats|arrangement|remarks <value>
-mv <from> <to>
-lyrics add <idx> <pos> <jp>|<cn>
-lyrics set <idx> <pos> <jp>|<cn>
-lyrics del <idx> <pos>
-u
-redo
-save [path]
-fix-merge
-done
-```
+| 命令 | 说明 |
+| :--- | :--- |
+| `ls` | 列出所有段落及其编号、类型、拍数、歌词行数 |
+| `show <idx>` | 查看编号为 `idx` 的段落详情（逐行 JP/CN 歌词） |
+| `ins <idx> <type> <beats> [pure]` | 在编号 `idx` 后插入新段落；`idx=0` 表示插到最前面；加 `pure` 则歌词填”纯动作/无歌词” |
+| `inject <idx> <txt_path>` | 读取 txt 歌词文件，在编号 `idx` 后进入注入流水线并插入新段落 |
+| `del <idx>` | 删除编号为 `idx` 的段落 |
+| `set <idx> type\|beats\|arrangement\|remarks <value>` | 修改指定段落的类型、拍数、编排或备注字段 |
+| `mv <from> <to>` | 将编号 `from` 的段落移动到编号 `to` 的位置 |
+| `lyrics add <idx> <pos> <jp>\|<cn>` | 在段落 `idx` 的第 `pos` 行前插入一行歌词（日文\|中文） |
+| `lyrics set <idx> <pos> <jp>\|<cn>` | 替换段落 `idx` 第 `pos` 行歌词 |
+| `lyrics del <idx> <pos>` | 删除段落 `idx` 第 `pos` 行歌词；若删后为空则自动填”纯动作/无歌词” |
+| `u` | 撤销上一步操作（基于快照，可多次撤销） |
+| `redo` | 重做被撤销的操作 |
+| `save [path]` | 保存为 xlsx；不指定路径则覆盖原文件（或使用默认命名） |
+| `fix-merge` | 提示信息；保存时会自动按当前段落结构重建合并单元格，无需手动执行 |
+| `done` | 退出编辑模式并保存 |
 
-说明：
-- `fix-merge` 不会直接改文件；保存时会自动按当前段落结构重建合并单元格。
-- xlsx 读取当前仅保证兼容**本工具生成的标准模板**。
-- `show <idx>` 用于查看该编号块的详细歌词（逐行 JP/CN）。
-- `inject` 会读取 txt（按日/中交替），并在指定编号段落后进入“注入流水线”插入新块。
-- 注入流水线快捷键：`Enter` 收纳，`↓/j/skip` 跳过当前行，`↑/u` 回退，`q/quit` 中途退出并保留已生成块。
+注入流水线快捷键：`Enter` 收纳当前行，`↓/j/skip` 跳过当前行，`↑/u` 回退，`q/quit` 中途退出并保留已生成块。
+
+xlsx 读取当前仅保证兼容**本工具生成的标准模板**。
 
 ### 第三步：执行指令
 
@@ -120,8 +117,7 @@ done
 这是脚本的核心，用于将 txt 歌词分配到对应板块：
 * **收纳 (Accumulate)**：直接按 **回车**。当前显示的日文/中文歌词会被存入“暂存区”，并自动展示下一句。
 * **打包 (Pack)**：输入 `类型 + 拍数`（如 `r 16`）。脚本只会打包“暂存区”的歌词，并清空暂存区；当前行会保留，不会自动跳到下一句。
-* **插入纯间奏**：如果在暂存区为空时输入 `i 4`，脚本会插入一段 4 拍的纯动作间奏，不消耗任何歌词。
-* **空暂存打包**：当暂存区为空时也允许打包，会插入“歌词留空”的块。
+* **空暂存打包**：当暂存区为空时也允许打包，会插入”歌词留空”的块。
 * **跳过当前行 (Skip)**：输入 `skip`（或 `↓` / `j`）跳过当前歌词，不进入暂存区。
 
 **C. 全局撤销 (Undo)**
